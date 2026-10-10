@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10120f">
+  <title>LTC Grid Lab — Paper trading</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10120f;
+      --sidebar: #141612;
+      --panel: #191c18;
+      --raised: #20231e;
+      --line: #30342d;
+      --text: #f1f1e9;
+      --muted: #92978c;
+      --lime: #d6f56a;
+      --green: #8fda9f;
+      --red: #f17970;
+      --orange: #f5a65b;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      min-width: 320px; min-height: 100vh; margin: 0;
+      background: var(--bg); color: var(--text);
+      font: 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    .layout { min-height: 100vh; }
+    .sidebar {
+      position: fixed; inset: 0 auto 0 0; z-index: 3; width: 218px;
+      display: flex; flex-direction: column; padding: 24px 15px;
+      border-right: 1px solid var(--line); background: var(--sidebar);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px; }
+    .brand-icon {
+      display: grid; width: 34px; height: 34px; place-items: center;
+      border-radius: 10px; background: var(--lime); color: #171a10;
+      font-weight: 800; letter-spacing: -1px;
+    }
+    .brand-title { font-size: 15px; font-weight: 750; letter-spacing: -.45px; }
+    .brand-title span { color: var(--lime); }
+    .side-caption { margin: 36px 10px 11px; color: #74796e; font-size: 9px; font-weight: 750; letter-spacing: 1.25px; text-transform: uppercase; }
+    .side-link { display: flex; align-items: center; gap: 11px; min-height: 39px; padding: 0 10px; border: 1px solid transparent; border-radius: 8px; color: #a5a99f; font-size: 11px; }
+    .side-link.active { border-color: #34382c; background: #24271f; color: var(--text); }
+    .side-link svg { width: 16px; height: 16px; color: #92978b; }
+    .side-link.active svg { color: var(--lime); }
+    .sidebar-bottom { margin-top: auto; }
+    .side-note { padding: 13px; border: 1px solid #463b2e; border-radius: 10px; background: #211e18; color: #b6a38d; font-size: 10px; }
+    .side-note strong { display: block; margin-bottom: 5px; color: var(--orange); font-size: 10px; }
+    .operator { display: flex; align-items: center; gap: 9px; margin-top: 15px; padding: 15px 6px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+    .avatar { display: grid; width: 27px; height: 27px; place-items: center; border: 1px solid #41473b; border-radius: 50%; color: var(--lime); font-size: 9px; font-weight: 700; }
+    main { max-width: 1560px; margin-left: 218px; padding: 0 36px 40px; }
+    .topbar { display: flex; height: 63px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+    .crumb { color: var(--muted); font-size: 11px; }
+    .crumb span { margin: 0 8px; color: #5e6359; }
+    .paper-tag { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border: 1px solid #475534; border-radius: 20px; background: #23291b; color: var(--lime); font-size: 9px; font-weight: 750; letter-spacing: .6px; }
+    .paper-tag::before { width: 6px; height: 6px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 8px #d6f56a7a; content: ""; }
+    .heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin: 27px 0 18px; }
+    .eyebrow { color: var(--lime); font-size: 9px; font-weight: 750; letter-spacing: 1.4px; text-transform: uppercase; }
+    h1 { margin: 6px 0 0; font-size: clamp(25px, 3vw, 33px); font-weight: 650; letter-spacing: -1.1px; }
+    .subtitle { margin: 6px 0 0; color: var(--muted); font-size: 11px; }
+    .header-actions { display: flex; gap: 8px; }
+    .button {
+      display: inline-flex; min-height: 35px; align-items: center; justify-content: center; gap: 7px;
+      padding: 0 12px; border: 1px solid var(--line); border-radius: 8px;
+      background: var(--raised); color: #d8dbd1; cursor: pointer; font-size: 10px; font-weight: 650;
+      transition: border-color .15s, background .15s, transform .15s;
+    }
+    .button:hover { border-color: #5a624d; background: #282c24; }
+    .button:active { transform: translateY(1px); }
+    .button.primary { border-color: var(--lime); background: var(--lime); color: #171a10; }
+    .button.primary:hover { background: #e3ff86; }
+    .button.danger { border-color: #63403b; background: #2c211f; color: #f2a198; }
+    .button.danger:hover { border-color: var(--red); background: #382421; }
+    .button svg { width: 14px; height: 14px; }
+    .notice {
+      display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; padding: 11px 13px;
+      border: 1px solid #51422e; border-radius: 9px; background: #211e18; color: #c6b69e; font-size: 10px;
+    }
+    .notice svg { width: 15px; height: 15px; flex: 0 0 15px; margin-top: 1px; color: var(--orange); }
+    .notice strong { color: #f0c18d; }
+    .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+    .metric { min-height: 92px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel); }
+    .metric-label { color: var(--muted); font-size: 9px; }
+    .metric-value { margin-top: 8px; font-size: 21px; font-weight: 670; letter-spacing: -.55px; font-variant-numeric: tabular-nums; }
+    .metric-value small { margin-left: 4px; color: var(--muted); font-size: 10px; font-weight: 450; letter-spacing: 0; }
+    .metric-foot { margin-top: 2px; color: #797e73; font-size: 9px; }
+    .positive { color: var(--green) !important; }
+    .negative { color: var(--red) !important; }
+    .work-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(270px, .78fr); gap: 12px; margin-top: 12px; }
+    .panel { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+    .panel-head { display: flex; min-height: 53px; align-items: center; justify-content: space-between; gap: 10px; padding: 0 15px; border-bottom: 1px solid var(--line); }
+    .panel-title { margin: 0; font-size: 11px; font-weight: 700; }
+    .panel-caption { margin-top: 3px; color: var(--muted); font-size: 9px; }
+    .market-label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 9px; }
+    .market-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--orange); }
+    .chart-wrap { padding: 12px 13px 4px; }
+    #grid-chart { display: block; width: 100%; height: 230px; overflow: visible; }
+    .chart-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 14px 12px; color: var(--muted); font-size: 9px; }
+    .chart-legend { display: flex; flex-wrap: wrap; gap: 12px; }
+    .legend-item { display: inline-flex; align-items: center; gap: 5px; }
+    .legend-mark { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); }
+    .legend-mark.buy { background: #7ba7ff; }
+    .legend-mark.sell { background: var(--orange); }
+    .price-buttons { display: flex; gap: 5px; }
+    .mini-button { min-height: 25px; padding: 0 8px; border: 1px solid #393d34; border-radius: 6px; background: #20231e; color: #c1c5bb; cursor: pointer; font-size: 9px; }
+    .mini-button:hover { border-color: #77864f; color: var(--lime); }
+    .config-body { display: grid; gap: 12px; padding: 13px 14px 14px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+    .field label { display: block; margin-bottom: 5px; color: #a8ada2; font-size: 9px; }
+    .input-wrap { position: relative; }
+    .field input {
+      width: 100%; height: 33px; padding: 0 48px 0 9px; outline: none;
+      border: 1px solid #383c33; border-radius: 7px; background: #131510; color: var(--text);
+      font-size: 10px; font-variant-numeric: tabular-nums;
+    }
+    .field input:focus { border-color: #849d4d; }
+    .input-unit { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); color: #7d8278; font-size: 8px; pointer-events: none; }
+    .full-field input { padding-right: 62px; }
+    .config-note { margin: -4px 0 0; color: #83887d; font-size: 9px; line-height: 1.5; }
+    .config-buttons { display: flex; gap: 7px; }
+    .config-buttons .button { flex: 1; min-width: 0; padding: 0 7px; font-size: 9px; }
+    .runtime-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 1px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 9px; }
+    .runtime-status strong { color: #b7bcaf; font-weight: 600; }
+    .bottom-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(300px, .9fr); gap: 12px; margin-top: 12px; }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { padding: 9px 13px; color: #777d71; font-size: 8px; font-weight: 700; letter-spacing: .55px; white-space: nowrap; }
+    td { padding: 9px 13px; border-top: 1px solid #2b2e27; color: #cbd0c5; font-size: 9px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td.muted, .muted { color: var(--muted); }
+    .side-badge { display: inline-flex; padding: 3px 7px; border-radius: 5px; font-size: 8px; font-weight: 700; }
+    .side-badge.buy { background: #1d2738; color: #9ebcff; }
+    .side-badge.sell { background: #30251b; color: #f2b875; }
+    .empty-row { padding: 19px; color: var(--muted); font-size: 9px; text-align: center; }
+    .history { max-height: 220px; overflow-y: auto; padding: 2px 14px; }
+    .history-item { display: grid; grid-template-columns: 45px 1fr auto; align-items: center; gap: 8px; min-height: 36px; border-bottom: 1px solid #2b2e27; font-size: 9px; }
+    .history-item:last-child { border-bottom: 0; }
+    .history-time { color: #72776d; font-variant-numeric: tabular-nums; }
+    .history-text { color: #c1c5bb; }
+    .history-result { text-align: right; font-variant-numeric: tabular-nums; }
+    .disclaimer { margin: 13px 0 0; color: #757a70; font-size: 9px; line-height: 1.55; text-align: center; }
+    .toast { position: fixed; right: 18px; bottom: 18px; z-index: 5; max-width: min(350px, calc(100vw - 30px)); padding: 10px 13px; transform: translateY(10px); opacity: 0; pointer-events: none; border: 1px solid #4b5735; border-radius: 8px; background: #24291d; color: var(--lime); font-size: 10px; box-shadow: 0 10px 35px #0006; transition: opacity .18s, transform .18s; }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    @media (max-width: 1080px) {
+      .sidebar { width: 190px; }
+      main { margin-left: 190px; padding-right: 20px; padding-left: 20px; }
+      .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .work-grid { grid-template-columns: minmax(0, 1.2fr) minmax(250px, .8fr); }
+      .bottom-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      .sidebar { position: sticky; inset: 0 0 auto; width: 100%; height: 55px; flex-direction: row; align-items: center; padding: 8px 13px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .side-caption, .side-link, .sidebar-bottom { display: none; }
+      main { margin-left: 0; padding: 0 15px 28px; }
+      .topbar { height: 49px; }
+      .heading { align-items: flex-start; }
+      .work-grid { grid-template-columns: 1fr; }
+      .config-body { grid-template-columns: 1fr 1fr; }
+      .config-body > .field-row, .config-body > .config-note, .config-body > .config-buttons, .config-body > .runtime-status { grid-column: 1 / -1; }
+      #grid-chart { height: 210px; }
+    }
+    @media (max-width: 480px) {
+      main { padding-right: 11px; padding-left: 11px; }
+      .heading { flex-direction: column; gap: 12px; margin-top: 21px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .metric { min-height: 82px; padding: 11px; }
+      .metric-value { font-size: 18px; }
+      .header-actions { width: 100%; }
+      .header-actions .button { flex: 1; }
+      .config-body { display: grid; grid-template-columns: 1fr; }
+      .config-body > * { grid-column: auto !important; }
+      #grid-chart { height: 185px; }
+      .chart-footer { align-items: flex-start; flex-direction: column; }
+      .chart-legend { gap: 9px; }
+      .notice { font-size: 9px; }
+      .panel-head { padding-right: 11px; padding-left: 11px; }
+      th, td { padding-right: 9px; padding-left: 9px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Paper trading navigation">
+      <div class="brand"><span class="brand-icon" aria-hidden="true">L</span><span class="brand-title">Grid<span>Lab</span></span></div>
+      <div class="side-caption">Paper trading</div>
+      <a class="side-link active" href="#overview" aria-current="page">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/></svg>Overview
+      </a>
+      <a class="side-link" href="#strategy">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V5m0 14h17M7 15l4-4 3 2 5-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Grid strategy
+      </a>
+      <a class="side-link" href="#positions">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5.5h16v13H4zM8 9h8M8 12h8m-8 3h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Open positions
+      </a>
+      <a class="side-link" href="#history">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Trade history
+      </a>
+      <div class="sidebar-bottom">
+        <div class="side-note"><strong>Paper mode only</strong>This page uses simulated prices and virtual funds. It cannot connect to Binance or place real trades.</div>
+        <div class="operator"><span class="avatar">GX</span><span>Local simulator</span></div>
+      </div>
+    </aside>
+
+    <main id="overview">
+      <header class="topbar"><div class="crumb">Workspace <span>/</span> LTC grid lab</div><div class="paper-tag">PAPER TRADING</div></header>
+      <section class="heading">
+        <div><div class="eyebrow">Futures grid · practice mode</div><h1>LTC grid simulator</h1><p class="subtitle">Explore a grid strategy with virtual orders before considering any real-market setup.</p></div>
+        <div class="header-actions">
+          <button class="button" id="reset-button" type="button">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 7v5h-5M4.6 9a7.5 7.5 0 0 1 12.7-2L20 12M4 17v-5h5m10.4 3a7.5 7.5 0 0 1-12.7 2L4 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Reset paper account
+          </button>
+          <button class="button primary" id="run-button" type="button">Start simulation</button>
+        </div>
+      </section>
+
+      <div class="notice" role="note">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 21 20H3L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 9v5m0 3h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <div><strong>Simulation only — no Binance connection.</strong> Price, fills, fees and P&amp;L here are illustrative, not live. Your 150 USDT is treated as 150 USDC-equivalent for this practice ledger (assumed 1:1); the 5.06 USDC order size is simulated notional at 1×. Funding, slippage and liquidation are not modeled.</div>
+      </div>
+
+      <section class="metrics" aria-label="Paper account summary">
+        <article class="metric"><div class="metric-label">Paper equity</div><div class="metric-value"><span id="equity">150.00</span><small>USDT eq.</small></div><div class="metric-foot">includes unrealized P&amp;L</div></article>
+        <article class="metric"><div class="metric-label">Realized P&amp;L</div><div class="metric-value" id="realized">+0.00<small>USDC eq.</small></div><div class="metric-foot">after simulated fees</div></article>
+        <article class="metric"><div class="metric-label">Unrealized P&amp;L</div><div class="metric-value" id="unrealized">+0.00<small>USDC eq.</small></div><div class="metric-foot">open positions · mark to mock price</div></article>
+        <article class="metric"><div class="metric-label">Available margin</div><div class="metric-value"><span id="available">150.00</span><small>USDC eq.</small></div><div class="metric-foot"><span id="margin-used">0.00</span> used · 1× simulated</div></article>
+        <article class="metric"><div class="metric-label">Completed grid trades</div><div class="metric-value" id="trade-count">0</div><div class="metric-foot"><span id="win-rate">—</span> profitable closes</div></article>
+      </section>
+
+      <div class="work-grid">
+        <section class="panel" id="strategy" aria-labelledby="chart-title">
+          <header class="panel-head">
+            <div><h2 class="panel-title" id="chart-title">Grid levels · LTC/USDC</h2><div class="panel-caption">Synthetic price stream · not Binance market data</div></div>
+            <div class="market-label"><span class="market-dot"></span><span id="run-status">Paused</span></div>
+          </header>
+          <div class="chart-wrap"><svg id="grid-chart" viewBox="0 0 760 250" role="img" aria-label="Simulated LTC price and futures grid levels"></svg></div>
+          <div class="chart-footer">
+            <div class="chart-legend"><span class="legend-item"><i class="legend-mark"></i>Mock mark</span><span class="legend-item"><i class="legend-mark buy"></i>Buy level</span><span class="legend-item"><i class="legend-mark sell"></i>Sell level</span></div>
+            <div class="price-buttons">
+              <button class="mini-button" id="step-down" type="button" aria-label="Move mock price down one grid">− 1 grid</button>
+              <button class="mini-button" id="step-up" type="button" aria-label="Move mock price up one grid">+ 1 grid</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="config-title">
+          <header class="panel-head"><div><h2 class="panel-title" id="config-title">Grid configuration</h2><div class="panel-caption">Adjust the paper strategy</div></div></header>
+          <div class="config-body">
+            <div class="field-row">
+              <div class="field"><label for="balance-input">Starting balance</label><div class="input-wrap"><input id="balance-input" type="number" min="10" max="1000000" step="1" value="150"><span class="input-unit">USDT</span></div></div>
+              <div class="field"><label for="size-input">Order notional</label><div class="input-wrap"><input id="size-input" type="number" min="1" max="100000" step="0.01" value="5.06"><span class="input-unit">USDC</span></div></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label for="lower-input">Lower price</label><div class="input-wrap"><input id="lower-input" type="number" min="0.01" step="0.01" value="80"><span class="input-unit">USDC</span></div></div>
+              <div class="field"><label for="upper-input">Upper price</label><div class="input-wrap"><input id="upper-input" type="number" min="0.02" step="0.01" value="90"><span class="input-unit">USDC</span></div></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label for="grids-input">Grid intervals</label><div class="input-wrap"><input id="grids-input" type="number" min="4" max="20" step="1" value="10"><span class="input-unit">4–20</span></div></div>
+              <div class="field"><label for="fee-input">Fee per fill</label><div class="input-wrap"><input id="fee-input" type="number" min="0" max="1" step="0.001" value="0.05"><span class="input-unit">%</span></div></div>
+            </div>
+            <div class="field full-field"><label for="price-input">Mock starting price</label><div class="input-wrap"><input id="price-input" type="number" min="0.01" step="0.01" value="85"><span class="input-unit">USDC / LTC</span></div></div>
+            <p class="config-note">Each entry uses your selected notional as simulated position size. Leverage is fixed at 1× in this demo. Grid needs the starting price inside the lower/upper range.</p>
+            <div class="config-buttons"><button class="button primary" id="apply-button" type="button">Apply &amp; reset grid</button><button class="button" id="pause-button" type="button" disabled>Pause</button></div>
+            <div class="runtime-status"><span>Simulation</span><strong id="runtime-label">Not started</strong></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="bottom-grid">
+        <section class="panel" id="positions" aria-labelledby="positions-title">
+          <header class="panel-head"><div><h2 class="panel-title" id="positions-title">Open paper positions</h2><div class="panel-caption">Grid fills waiting for the next opposite level</div></div><span class="market-label" id="position-count">0 open</span></header>
+          <div class="table-scroll"><table>
+            <thead><tr><th>SIDE</th><th>SIZE</th><th>ENTRY</th><th>TAKE PROFIT</th><th>UNREALIZED P&amp;L</th><th>MARGIN</th></tr></thead>
+            <tbody id="position-rows"><tr><td class="empty-row" colspan="6">Start the simulation to place virtual grid orders.</td></tr></tbody>
+          </table></div>
+        </section>
+        <section class="panel" id="history" aria-labelledby="history-title">
+          <header class="panel-head"><div><h2 class="panel-title" id="history-title">Paper trade history</h2><div class="panel-caption">Recent simulated fills and grid closes</div></div><span class="market-label" id="history-count">0 events</span></header>
+          <div class="history" id="history-list"><div class="empty-row">No simulated trades yet.</div></div>
+        </section>
+      </div>
+      <p class="disclaimer">Educational paper-trading demo only. It uses a locally generated price stream, not Binance data, and cannot place orders. Simulated results do not predict future outcomes. Futures are risky; don't trade money you can't afford to lose.</p>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      const $ = (selector, root = document) => root.querySelector(selector);
+      const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+      const initialConfig = { balance: 150, notional: 5.06, lower: 80, upper: 90, intervals: 10, feePercent: 0.05, price: 85 };
+      const config = { ...initialConfig };
+      let wallet = config.balance;
+      let mark = config.price;
+      let previousMark = mark;
+      let levels = [];
+      let orders = [];
+      let positions = [];
+      let history = [];
+      let running = false;
+      let timer = null;
+      let toastTimer = null;
+      let rejectedAt = new Set();
+      let completedTrades = 0;
+      let profitableTrades = 0;
+
+      const format = (number, decimals = 2) => Number(number).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+      const signed = (number) => `${number >= 0 ? "+" : ""}${format(number)}`;
+      const feeRate = () => config.feePercent / 100;
+      const feeFor = (notional) => notional * feeRate();
+      const usedMargin = () => positions.reduce((sum, position) => sum + position.margin, 0);
+      const unrealized = () => positions.reduce((sum, position) => {
+        const value = position.side === "LONG"
+          ? (mark - position.entry) * position.quantity
+          : (position.entry - mark) * position.quantity;
+        return sum + value;
+      }, 0);
+      const equity = () => wallet + unrealized();
+      const availableMargin = () => Math.max(0, equity() - usedMargin());
+      const gridStep = () => (config.upper - config.lower) / config.intervals;
+
+      function toast(message) {
+        const node = $("#toast");
+        node.textContent = message;
+        node.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => node.classList.remove("show"), 2700);
+      }
+
+      function addHistory(message, result = null) {
+        history.unshift({ time: new Date(), message, result });
+        history = history.slice(0, 30);
+        renderHistory();
+      }
+
+      function initializeOrders() {
+        levels = Array.from({ length: config.intervals + 1 }, (_, index) => config.lower + gridStep() * index);
+        orders = levels.map((price, index) => {
+          if (Math.abs(price - mark) < 1e-8) return null;
+          return { index, price, side: price < mark ? "BUY" : "SELL", active: true };
+        }).filter(Boolean);
+        positions = [];
+        history = [];
+        rejectedAt = new Set();
+        completedTrades = 0;
+        profitableTrades = 0;
+      }
+
+      function resetPaperAccount(loadForm = true) {
+        if (running) return;
+        if (loadForm) {
+          const next = readConfiguration();
+          if (!next) return;
+          Object.assign(config, next);
+        }
+        wallet = config.balance;
+        mark = config.price;
+        previousMark = mark;
+        initializeOrders();
+        render();
+        toast("Paper account reset. No real funds or exchange connection.");
+      }
+
+      function readConfiguration() {
+        const fields = {
+          balance: $("#balance-input"),
+          notional: $("#size-input"),
+          lower: $("#lower-input"),
+          upper: $("#upper-input"),
+          intervals: $("#grids-input"),
+          feePercent: $("#fee-input"),
+          price: $("#price-input")
+        };
+        for (const [name, input] of Object.entries(fields)) {
+          if (!input.value || !input.checkValidity()) {
+            input.reportValidity();
+            return null;
+          }
+        }
+        const next = Object.fromEntries(Object.entries(fields).map(([key, input]) => [key, Number(input.value)]));
+        if (next.lower >= next.upper) {
+          $("#upper-input").setCustomValidity("Upper price must be greater than lower price.");
+          $("#upper-input").reportValidity();
+          $("#upper-input").setCustomValidity("");
+          return null;
+        }
+        if (next.price <= next.lower || next.price >= next.upper) {
+          $("#price-input").setCustomValidity("Mock starting price must be inside the grid range.");
+          $("#price-input").reportValidity();
+          $("#price-input").setCustomValidity("");
+          return null;
+        }
+        if (next.notional > next.balance) {
+          $("#size-input").setCustomValidity("Order notional must not exceed the starting balance in this 1× paper simulation.");
+          $("#size-input").reportValidity();
+          $("#size-input").setCustomValidity("");
+          return null;
+        }
+        return next;
+      }
+
+      function startSimulation() {
+        if (running) {
+          stopSimulation();
+          return;
+        }
+        const next = readConfiguration();
+        if (!next) return;
+        Object.assign(config, next);
+        wallet = config.balance;
+        mark = config.price;
+        previousMark = mark;
+        initializeOrders();
+        running = true;
+        timer = setInterval(mockMarketTick, 2200);
+        addHistory("Paper grid started", null);
+        render();
+        toast("Simulation started with a synthetic price stream.");
+      }
+
+      function stopSimulation() {
+        if (!running) return;
+        running = false;
+        clearInterval(timer);
+        timer = null;
+        render();
+        toast("Simulation paused. Open paper positions remain in the ledger.");
+      }
+
+      function enterPosition(order) {
+        const margin = config.notional;
+        if (availableMargin() < margin) {
+          if (!rejectedAt.has(order.index)) {
+            rejectedAt.add(order.index);
+            addHistory(`${order.side} at ${format(order.price)} skipped · insufficient simulated margin`);
+          }
+          return;
+        }
+        order.active = false;
+        const side = order.side === "BUY" ? "LONG" : "SHORT";
+        const targetIndex = order.side === "BUY" ? order.index + 1 : order.index - 1;
+        if (targetIndex < 0 || targetIndex >= levels.length) return;
+        const fee = feeFor(config.notional);
+        wallet -= fee;
+        const position = {
+          id: `${Date.now()}-${Math.random()}`,
+          side,
+          entry: order.price,
+          target: levels[targetIndex],
+          entryIndex: order.index,
+          orderSide: order.side,
+          quantity: config.notional / order.price,
+          notional: config.notional,
+          margin,
+          entryFee: fee
+        };
+        positions.push(position);
+        addHistory(`${order.side} filled at ${format(order.price)} · ${format(config.notional)} USDC notional`);
+      }
+
+      function closePosition(position) {
+        const pnl = position.side === "LONG"
+          ? (position.target - position.entry) * position.quantity
+          : (position.entry - position.target) * position.quantity;
+        const closeFee = feeFor(position.quantity * position.target);
+        wallet += pnl - closeFee;
+        positions = positions.filter((item) => item.id !== position.id);
+        const rearmed = orders.find((order) => order.index === position.entryIndex);
+        if (rearmed) rearmed.active = true;
+        const netPnl = pnl - position.entryFee - closeFee;
+        completedTrades += 1;
+        if (netPnl > 0) profitableTrades += 1;
+        addHistory(`${position.side} grid closed at ${format(position.target)}`, netPnl);
+      }
+
+      function advancePrice(nextPrice) {
+        if (!Number.isFinite(nextPrice) || nextPrice <= 0) return;
+        previousMark = mark;
+        mark = nextPrice;
+        if (running) {
+          const closing = positions.filter((position) => position.side === "LONG"
+            ? previousMark < position.target && mark >= position.target
+            : previousMark > position.target && mark <= position.target);
+          closing.forEach(closePosition);
+          const triggered = orders.filter((order) => order.active && (order.side === "BUY"
+            ? previousMark > order.price && mark <= order.price
+            : previousMark < order.price && mark >= order.price));
+          triggered.sort((a, b) => a.side === "BUY" ? b.price - a.price : a.price - b.price);
+          triggered.forEach(enterPosition);
+        }
+        render();
+      }
+
+      function mockMarketTick() {
+        const center = (config.lower + config.upper) / 2;
+        const pull = ((center - mark) / center) * 0.001;
+        const noise = (Math.random() - 0.5) * 0.004;
+        advancePrice(Math.max(0.01, mark * (1 + pull + noise)));
+      }
+
+      function moveMockPrice(direction) {
+        if (!running) {
+          toast("Start the simulation before stepping the mock price.");
+          return;
+        }
+        advancePrice(Math.max(0.01, mark + direction * gridStep()));
+      }
+
+      function renderMetrics() {
+        const total = equity();
+        const realizedPnl = wallet - config.balance;
+        const openPnl = unrealized();
+        $("#equity").textContent = format(total);
+        const realizedNode = $("#realized");
+        realizedNode.innerHTML = `${signed(realizedPnl)}<small>USDC eq.</small>`;
+        realizedNode.className = `metric-value ${realizedPnl > 0.00001 ? "positive" : realizedPnl < -0.00001 ? "negative" : ""}`;
+        const unrealizedNode = $("#unrealized");
+        unrealizedNode.innerHTML = `${signed(openPnl)}<small>USDC eq.</small>`;
+        unrealizedNode.className = `metric-value ${openPnl > 0.00001 ? "positive" : openPnl < -0.00001 ? "negative" : ""}`;
+        $("#available").textContent = format(availableMargin());
+        $("#margin-used").textContent = format(usedMargin());
+        $("#trade-count").textContent = completedTrades;
+        $("#win-rate").textContent = completedTrades ? `${Math.round(profitableTrades / completedTrades * 100)}%` : "—";
+        $("#run-status").textContent = running ? "Mock stream · running" : "Paused";
+        $("#runtime-label").textContent = running ? "Running · mock prices" : history.length ? "Paused" : "Not started";
+        $("#run-button").textContent = running ? "Stop simulation" : "Start simulation";
+        $("#run-button").classList.toggle("danger", running);
+        $("#pause-button").disabled = !running;
+        $("#position-count").textContent = `${positions.length} open`;
+        $("#history-count").textContent = `${history.length} events`;
+      }
+
+      function renderPositions() {
+        const body = $("#position-rows");
+        body.replaceChildren();
+        if (!positions.length) {
+          const row = body.insertRow();
+          const cell = row.insertCell();
+          cell.colSpan = 6;
+          cell.className = "empty-row";
+          cell.textContent = running ? "No open positions. Waiting for mock price to cross a grid level." : "No open paper positions.";
+          return;
+        }
+        positions.forEach((position) => {
+          const row = body.insertRow();
+          const pnl = position.side === "LONG"
+            ? (mark - position.entry) * position.quantity
+            : (position.entry - mark) * position.quantity;
+          const side = row.insertCell();
+          const badge = document.createElement("span");
+          badge.className = `side-badge ${position.side === "LONG" ? "buy" : "sell"}`;
+          badge.textContent = position.side;
+          side.append(badge);
+          [format(position.notional), format(position.entry), format(position.target)].forEach((value) => row.insertCell().textContent = value);
+          const profit = row.insertCell();
+          profit.className = pnl >= 0 ? "positive" : "negative";
+          profit.textContent = signed(pnl);
+          row.insertCell().textContent = format(position.margin);
+        });
+      }
+
+      function renderHistory() {
+        const list = $("#history-list");
+        list.replaceChildren();
+        if (!history.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-row";
+          empty.textContent = "No simulated trades yet.";
+          list.append(empty);
+          return;
+        }
+        history.slice(0, 20).forEach((entry) => {
+          const item = document.createElement("div");
+          item.className = "history-item";
+          const time = document.createElement("time");
+          time.className = "history-time";
+          time.textContent = entry.time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+          const message = document.createElement("span");
+          message.className = "history-text";
+          message.textContent = entry.message;
+          const result = document.createElement("span");
+          result.className = `history-result${entry.result === null ? "" : entry.result >= 0 ? " positive" : " negative"}`;
+          result.textContent = entry.result === null ? "" : signed(entry.result);
+          item.append(time, message, result);
+          list.append(item);
+        });
+      }
+
+      function renderChart() {
+        const svg = $("#grid-chart");
+        svg.replaceChildren();
+        const width = 760, height = 250;
+        const left = 58, right = 67, top = 14, bottom = 25;
+        const plotWidth = width - left - right;
+        const plotHeight = height - top - bottom;
+        const step = gridStep();
+        const min = Math.max(0, config.lower - step * 0.7);
+        const max = config.upper + step * 0.7;
+        const x = (index) => left + plotWidth * index / Math.max(1, config.intervals);
+        const y = (price) => top + plotHeight * (max - price) / (max - min);
+        const make = (tag, attrs, text) => {
+          const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+          Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, String(value)));
+          if (text !== undefined) node.textContent = text;
+          svg.append(node);
+          return node;
+        };
+        for (let i = 0; i <= 4; i++) {
+          const price = max - (max - min) * i / 4;
+          make("line", { x1: left, y1: y(price), x2: width - right, y2: y(price), stroke: "#30342d", "stroke-width": 1, "stroke-dasharray": "3 5" });
+          make("text", { x: width - right + 8, y: y(price) + 3, fill: "#888d82", "font-size": 9 }, price.toFixed(2));
+        }
+        levels.forEach((price, index) => {
+          const isBuy = price < mark;
+          const order = orders.find((entry) => entry.index === index);
+          make("line", { x1: left, y1: y(price), x2: width - right, y2: y(price), stroke: isBuy ? "#7ba7ff" : "#f5a65b", "stroke-width": order && order.active ? 1.15 : .65, "stroke-opacity": order && order.active ? .55 : .23, "stroke-dasharray": "4 5" });
+        });
+        make("rect", { x: left, y: y(config.upper), width: plotWidth, height: y(config.lower) - y(config.upper), fill: "#d6f56a", "fill-opacity": ".025" });
+        levels.forEach((price, index) => {
+          const order = orders.find((entry) => entry.index === index);
+          if (!order || !order.active) return;
+          make("circle", { cx: x(index), cy: y(price), r: 3.2, fill: order.side === "BUY" ? "#7ba7ff" : "#f5a65b", stroke: "#191c18", "stroke-width": 1.4 });
+        });
+        const points = [
+          { time: Date.now() - 60000, price: config.price },
+          { time: Date.now() - 40000, price: config.price + (mark - config.price) * .15 },
+          { time: Date.now() - 20000, price: config.price + (mark - config.price) * .63 },
+          { time: Date.now(), price: mark }
+        ];
+        const pointX = (index) => left + plotWidth * index / (points.length - 1);
+        const pathData = points.map((point, index) => `${index ? "L" : "M"}${pointX(index)},${y(point.price)}`).join(" ");
+        make("path", { d: pathData, fill: "none", stroke: "#d6f56a", "stroke-width": 2.4, "stroke-linecap": "round", "stroke-linejoin": "round" });
+        make("circle", { cx: pointX(points.length - 1), cy: y(mark), r: 4.5, fill: "#d6f56a", stroke: "#10120f", "stroke-width": 2 });
+        make("line", { x1: left, y1: y(mark), x2: width - right, y2: y(mark), stroke: "#d6f56a", "stroke-width": 1, "stroke-opacity": ".5", "stroke-dasharray": "3 4" });
+        const label = make("text", { x: width - right + 7, y: y(mark) - 9, fill: "#d6f56a", "font-size": 9, "font-weight": 700 }, `${mark.toFixed(2)}*`);
+        label.setAttribute("aria-label", `Mock price ${mark.toFixed(2)} USDC`);
+        make("text", { x: left, y: height - 5, fill: "#74796f", "font-size": 8 }, `LOW ${config.lower.toFixed(2)}`);
+        make("text", { x: width - right - 5, y: height - 5, fill: "#74796f", "font-size": 8, "text-anchor": "end" }, `HIGH ${config.upper.toFixed(2)}`);
+      }
+
+      function render() {
+        renderMetrics();
+        renderPositions();
+        renderHistory();
+        renderChart();
+      }
+
+      $("#run-button").addEventListener("click", startSimulation);
+      $("#apply-button").addEventListener("click", () => {
+        if (running) {
+          toast("Pause the simulation before applying new grid settings.");
+          return;
+        }
+        resetPaperAccount(true);
+      });
+      $("#pause-button").addEventListener("click", stopSimulation);
+      $("#reset-button").addEventListener("click", () => {
+        if (running) {
+          toast("Stop the simulation before resetting the paper account.");
+          return;
+        }
+        Object.assign(config, initialConfig);
+        $("#balance-input").value = initialConfig.balance;
+        $("#size-input").value = initialConfig.notional;
+        $("#lower-input").value = initialConfig.lower;
+        $("#upper-input").value = initialConfig.upper;
+        $("#grids-input").value = initialConfig.intervals;
+        $("#fee-input").value = initialConfig.feePercent;
+        $("#price-input").value = initialConfig.price;
+        resetPaperAccount(false);
+      });
+      $("#step-down").addEventListener("click", () => moveMockPrice(-1));
+      $("#step-up").addEventListener("click", () => moveMockPrice(1));
+      $$(".side-link").forEach((link) => link.addEventListener("click", () => {
+        $$(".side-link").forEach((item) => {
+          const active = item === link;
+          item.classList.toggle("active", active);
+          if (active) item.setAttribute("aria-current", "page");
+          else item.removeAttribute("aria-current");
+        });
+      }));
+
+      initializeOrders();
+      render();
+    })();
+  </script>
+</body>
+</html>
